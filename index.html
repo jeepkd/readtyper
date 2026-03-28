@@ -136,6 +136,32 @@
         <!-- CENTER: TYPING AREA -->
         <main class="typing-main">
           <div class="typing-container" id="typing-container">
+            <div class="realtime-stats" id="realtime-stats">
+              <div class="rt-stat">
+                <span class="rt-value" id="rt-wpm">0</span>
+                <span class="rt-label">WPM</span>
+              </div>
+              <div class="rt-divider"></div>
+              <div class="rt-stat">
+                <span class="rt-value" id="rt-accuracy">100%</span>
+                <span class="rt-label">Accuracy</span>
+              </div>
+              <div class="rt-divider"></div>
+              <div class="rt-stat">
+                <span class="rt-value" id="rt-time">0:00</span>
+                <span class="rt-label">Time</span>
+              </div>
+              <div class="rt-divider"></div>
+              <div class="rt-stat">
+                <span class="rt-value" id="rt-words">0</span>
+                <span class="rt-label">Words</span>
+              </div>
+              <div class="rt-divider"></div>
+              <div class="rt-stat rt-stat-live">
+                <span class="rt-value" id="rt-live-wpm">—</span>
+                <span class="rt-label">Live WPM</span>
+              </div>
+            </div>
             <div class="text-display" id="text-display">
               <!-- Words rendered by JS -->
             </div>

@@ -38,6 +38,7 @@ export class TypingEngine {
     this.wordsCompleted = 0;
     this.wordErrors = {};
     this.isActive = false;
+    this.recentWordTimestamps = []; // for rolling WPM
 
     // Keep stats updating every second (for timer/WPM)
     this._timer = setInterval(() => {
@@ -107,11 +108,22 @@ export class TypingEngine {
 
     this.typedBuffer += key;
     this.currentCharIndex = this.typedBuffer.length;
+
+    // Auto-complete the last word when fully typed (no space needed)
+    if (
+      this.currentWordIndex === this.words.length - 1 &&
+      this.typedBuffer.length >= currentWord.length
+    ) {
+      this._completeWord();
+      return;
+    }
+
     this._emitUpdate();
   }
 
   _completeWord() {
     this.wordsCompleted++;
+    this.recentWordTimestamps.push(Date.now());
 
     if (this.onWordComplete) {
       this.onWordComplete(this.currentWordIndex, this.words[this.currentWordIndex]);
@@ -147,11 +159,21 @@ export class TypingEngine {
         ? Math.round((this.correctKeystrokes / this.totalKeystrokes) * 100)
         : 100;
 
+    // Rolling WPM (last 15 seconds)
+    const now = Date.now();
+    const windowMs = 15000;
+    const recentStamps = this.recentWordTimestamps.filter((t) => now - t < windowMs);
+    const liveWpm =
+      recentStamps.length >= 2
+        ? Math.round((recentStamps.length / ((now - recentStamps[0]) / 1000)) * 60)
+        : null;
+
     return {
       currentWordIndex: this.currentWordIndex,
       currentCharIndex: this.currentCharIndex,
       typedBuffer: this.typedBuffer,
       wpm,
+      liveWpm,
       accuracy,
       errorCount: this.errorCount,
       wordsCompleted: this.wordsCompleted,

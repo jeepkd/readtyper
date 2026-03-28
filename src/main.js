@@ -50,13 +50,20 @@ const booksGrid = $('books-grid');
 const emptyLibrary = $('empty-library');
 const backBtn = $('back-to-library');
 
-// Stats
+// Stats (sidebar)
 const statWpm = $('stat-wpm');
 const statAccuracy = $('stat-accuracy');
 const statErrors = $('stat-errors');
 const statTime = $('stat-time');
 const statWordsTyped = $('stat-words-typed');
 const statEta = $('stat-eta');
+
+// Real-time stats (above typing area)
+const rtWpm = $('rt-wpm');
+const rtAccuracy = $('rt-accuracy');
+const rtTime = $('rt-time');
+const rtWords = $('rt-words');
+const rtLiveWpm = $('rt-live-wpm');
 
 // Book info
 const bookTitle = $('current-book-title');
@@ -380,20 +387,28 @@ function scrollCurrentWordIntoView() {
 }
 
 function updateStats(state) {
+  const elapsed = state.elapsed;
+  const mins = Math.floor(elapsed / 60);
+  const secs = Math.floor(elapsed % 60);
+  const timeStr = `${mins}:${String(secs).padStart(2, '0')}`;
+
+  // Sidebar stats
   statWpm.textContent = state.wpm;
   statAccuracy.textContent = `${state.accuracy}%`;
   statErrors.textContent = state.errorCount;
   statWordsTyped.textContent = state.wordsCompleted;
-
-  const elapsed = state.elapsed;
-  const mins = Math.floor(elapsed / 60);
-  const secs = Math.floor(elapsed % 60);
-  statTime.textContent = `${mins}:${String(secs).padStart(2, '0')}`;
+  statTime.textContent = timeStr;
 
   // ETA
-  const wordsRemaining = state.totalWords - state.currentWordIndex;
   const totalRemaining = getTotalRemainingWords();
   statEta.textContent = estimateTimeToFinish(totalRemaining, state.wpm);
+
+  // Real-time stats bar
+  rtWpm.textContent = state.wpm;
+  rtAccuracy.textContent = `${state.accuracy}%`;
+  rtTime.textContent = timeStr;
+  rtWords.textContent = state.wordsCompleted;
+  rtLiveWpm.textContent = state.liveWpm !== null ? state.liveWpm : '—';
 
   // Update book progress
   const progress = getBookProgress(currentBookId);
