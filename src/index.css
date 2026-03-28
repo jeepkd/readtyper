@@ -811,16 +811,41 @@ body {
   color: #a5d6ff;
   margin-bottom: var(--space-xs);
 }
+.dict-phonetic-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
 .dict-phonetic {
   display: inline-block;
   font-size: 0.85rem;
   color: #7ee787;
-  margin-bottom: var(--space-sm);
   font-style: italic;
   background: rgba(126, 231, 135, 0.1);
   padding: 2px 8px;
   border-radius: var(--radius-full);
   letter-spacing: 0.5px;
+}
+.dict-audio-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  width: 28px;
+  height: 28px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  padding: 0;
+}
+.dict-audio-btn:hover {
+  border-color: #7ee787;
+  background: rgba(126, 231, 135, 0.1);
+  transform: scale(1.1);
 }
 .dict-meaning {
   margin-bottom: var(--space-sm);

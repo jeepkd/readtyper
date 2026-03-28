@@ -61,9 +61,16 @@ export async function fetchDefinition(word) {
     }
 
     const entry = data[0];
+
+    // Find the best audio URL from phonetics
+    const audioUrl = (entry.phonetics || [])
+      .map((p) => p.audio)
+      .find((a) => a && a.length > 0) || '';
+
     const result = {
       word: entry.word || cleanWord,
       phonetic: entry.phonetic || (entry.phonetics && entry.phonetics[0]?.text) || '',
+      audio: audioUrl,
       meanings: (entry.meanings || []).map((m) => ({
         partOfSpeech: m.partOfSpeech || '',
         definitions: (m.definitions || []).slice(0, 2).map((d) => d.definition),

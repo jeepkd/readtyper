@@ -668,8 +668,15 @@ function updateDictCardByIdx(idx) {
   }
 
   let html = `<div class="dict-word-text">${escapeHtml(def.word)}</div>`;
-  if (def.phonetic) {
-    html += `<div class="dict-phonetic">${escapeHtml(def.phonetic)}</div>`;
+  if (def.phonetic || def.audio) {
+    html += `<div class="dict-phonetic-row">`;
+    if (def.phonetic) {
+      html += `<span class="dict-phonetic">${escapeHtml(def.phonetic)}</span>`;
+    }
+    if (def.audio) {
+      html += `<button class="dict-audio-btn" data-audio="${escapeHtml(def.audio)}" title="Listen to pronunciation">🔊</button>`;
+    }
+    html += `</div>`;
   }
 
   for (const meaning of def.meanings.slice(0, 2)) {
@@ -682,6 +689,19 @@ function updateDictCardByIdx(idx) {
   }
 
   card.innerHTML = html;
+
+  // Attach audio click handler
+  const audioBtn = card.querySelector('.dict-audio-btn');
+  if (audioBtn) {
+    audioBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const url = audioBtn.dataset.audio;
+      if (url) {
+        const audio = new Audio(url);
+        audio.play().catch(() => {});
+      }
+    });
+  }
 }
 
 function highlightDictWord(wordIdx) {
