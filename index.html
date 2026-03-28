@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ReadTyper — Type Through Books</title>
+  <meta name="description" content="Practice touch typing by reading your favorite ebooks. Track progress, learn vocabulary, and finish more books." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/src/index.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- ========== LIBRARY VIEW ========== -->
+    <div id="library-view" class="view active">
+      <header class="library-header">
+        <div class="logo">
+          <span class="logo-icon">📖</span>
+          <h1>ReadTyper</h1>
+          <span class="logo-tagline">Type Through Books</span>
+        </div>
+        <div class="header-stats">
+          <div class="stat-pill" id="streak-pill">
+            <span class="stat-icon">🔥</span>
+            <span class="stat-value" id="streak-count">0</span>
+            <span class="stat-label">day streak</span>
+          </div>
+          <div class="stat-pill" id="books-pill">
+            <span class="stat-icon">📚</span>
+            <span class="stat-value" id="books-completed-count">0</span>
+            <span class="stat-label">books done</span>
+          </div>
+          <div class="stat-pill" id="goal-pill">
+            <svg class="goal-ring" viewBox="0 0 36 36">
+              <path class="goal-ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              <path class="goal-ring-fill" id="goal-ring-fill" stroke-dasharray="0, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+            </svg>
+            <span class="stat-value" id="goal-progress-text">0%</span>
+            <span class="stat-label">daily goal</span>
+          </div>
+        </div>
+      </header>
+
+      <main class="library-content">
+        <div class="library-actions">
+          <label class="import-btn" for="file-input" id="import-btn">
+            <span class="import-icon">+</span>
+            <span>Import Book</span>
+            <span class="import-hint">EPUB or TXT</span>
+          </label>
+          <input type="file" id="file-input" accept=".epub,.txt,.text" hidden />
+        </div>
+
+        <div class="books-grid" id="books-grid">
+          <!-- Book cards rendered by JS -->
+        </div>
+
+        <div class="empty-library" id="empty-library">
+          <div class="empty-icon">📚</div>
+          <h2>Your Library is Empty</h2>
+          <p>Import an EPUB or TXT file to start typing through books</p>
+        </div>
+      </main>
+
+      <!-- Settings Modal -->
+      <div class="modal-overlay" id="settings-modal">
+        <div class="modal">
+          <div class="modal-header">
+            <h2>⚙️ Settings</h2>
+            <button class="modal-close" id="settings-close">&times;</button>
+          </div>
+          <div class="modal-body">
+            <div class="setting-group">
+              <label class="setting-label">Daily Goal (words)</label>
+              <input type="number" id="daily-goal-input" class="setting-input" min="10" max="10000" value="500" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========== TYPING VIEW ========== -->
+    <div id="typing-view" class="view">
+      <div class="typing-layout">
+        <!-- LEFT SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+          <button class="back-btn" id="back-to-library">
+            <span>←</span> Library
+          </button>
+          <div class="book-info" id="book-info">
+            <h3 class="book-title" id="current-book-title"></h3>
+            <p class="book-author" id="current-book-author"></p>
+            <div class="book-progress-bar">
+              <div class="book-progress-fill" id="book-progress-fill"></div>
+            </div>
+            <span class="book-progress-text" id="book-progress-text">0%</span>
+          </div>
+
+          <div class="chapter-nav" id="chapter-nav">
+            <h4 class="section-title">Chapters</h4>
+            <ul class="chapter-list" id="chapter-list">
+              <!-- Rendered by JS -->
+            </ul>
+          </div>
+
+          <div class="session-stats" id="session-stats">
+            <h4 class="section-title">Session Stats</h4>
+            <div class="stat-row">
+              <span class="stat-name">WPM</span>
+              <span class="stat-val" id="stat-wpm">0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-name">Accuracy</span>
+              <span class="stat-val" id="stat-accuracy">100%</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-name">Errors</span>
+              <span class="stat-val" id="stat-errors">0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-name">Time</span>
+              <span class="stat-val" id="stat-time">0:00</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-name">Words Typed</span>
+              <span class="stat-val" id="stat-words-typed">0</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-name">ETA to Finish</span>
+              <span class="stat-val" id="stat-eta">—</span>
+            </div>
+          </div>
+        </aside>
+
+        <!-- CENTER: TYPING AREA -->
+        <main class="typing-main">
+          <div class="typing-container" id="typing-container">
+            <div class="text-display" id="text-display">
+              <!-- Words rendered by JS -->
+            </div>
+            <textarea class="typing-input" id="typing-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Start typing here…"></textarea>
+          </div>
+        </main>
+
+        <!-- RIGHT PANEL: DICTIONARY -->
+        <aside class="dictionary-panel" id="dictionary-panel">
+          <h4 class="section-title">📖 Dictionary</h4>
+          <div class="dict-list" id="dict-list">
+            <!-- Word definitions rendered by JS -->
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- MILESTONE TOAST -->
+    <div class="toast" id="milestone-toast">
+      <span class="toast-icon">🏆</span>
+      <span class="toast-message" id="toast-message"></span>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
