@@ -668,16 +668,12 @@ function updateDictCardByIdx(idx) {
   }
 
   let html = `<div class="dict-word-text">${escapeHtml(def.word)}</div>`;
-  if (def.phonetic || def.audio) {
-    html += `<div class="dict-phonetic-row">`;
-    if (def.phonetic) {
-      html += `<span class="dict-phonetic">${escapeHtml(def.phonetic)}</span>`;
-    }
-    if (def.audio) {
-      html += `<button class="dict-audio-btn" data-audio="${escapeHtml(def.audio)}" title="Listen to pronunciation">🔊</button>`;
-    }
-    html += `</div>`;
+  html += `<div class="dict-phonetic-row">`;
+  if (def.phonetic) {
+    html += `<span class="dict-phonetic">${escapeHtml(def.phonetic)}</span>`;
   }
+  html += `<button class="dict-audio-btn" data-audio="${escapeHtml(def.audio || '')}" data-word="${escapeHtml(def.word)}" title="Listen to pronunciation">🔊</button>`;
+  html += `</div>`;
 
   for (const meaning of def.meanings.slice(0, 2)) {
     html += `<div class="dict-meaning">`;
@@ -696,9 +692,14 @@ function updateDictCardByIdx(idx) {
     audioBtn.addEventListener('click', (e) => {
       e.stopPropagation();
       const url = audioBtn.dataset.audio;
+      const word = audioBtn.dataset.word;
       if (url) {
+        // Use API audio if available
         const audio = new Audio(url);
-        audio.play().catch(() => {});
+        audio.play().catch(() => speakWord(word));
+      } else {
+        // Fallback to browser speech synthesis
+        speakWord(word);
       }
     });
   }
@@ -840,6 +841,17 @@ function updateHeaderStats() {
   const goalPercent = getDailyGoalPercent();
   goalRingFill.setAttribute('stroke-dasharray', `${goalPercent}, 100`);
   goalProgressText.textContent = `${goalPercent}%`;
+}
+
+// ========== SPEECH SYNTHESIS FALLBACK ==========
+
+function speakWord(word) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(word);
+  utterance.lang = 'en-US';
+  utterance.rate = 0.9;
+  window.speechSynthesis.speak(utterance);
 }
 
 // ========== MILESTONE TOAST ==========
