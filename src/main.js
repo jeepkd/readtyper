@@ -39,6 +39,8 @@ let dictDefinitions = {};
 let sessionStartTime = null;
 let sessionWordsAtStart = 0;
 let lastRenderedWordIdx = -1;
+let wpmHistory = []; // { time: Date.now(), wpm: number }
+let lastWpmSampleTime = 0;
 
 // ========== DOM REFERENCES ==========
 const $ = (id) => document.getElementById(id);
@@ -432,6 +434,17 @@ function updateStats(state) {
   rtWords.textContent = state.wordsCompleted;
   rtLiveWpm.textContent = state.liveWpm !== null ? state.liveWpm : '—';
 
+  // Record WPM sample every 5 seconds
+  const now = Date.now();
+  if (state.wpm > 0 && now - lastWpmSampleTime >= 5000) {
+    wpmHistory.push({ time: now, wpm: state.wpm });
+    // Keep only last 5 minutes
+    const fiveMinAgo = now - 300000;
+    wpmHistory = wpmHistory.filter((s) => s.time >= fiveMinAgo);
+    lastWpmSampleTime = now;
+    renderWpmChart();
+  }
+
   // Update book progress
   const progress = getBookProgress(currentBookId);
   const percent = calcBookProgressPercent(currentBook, progress);
@@ -701,6 +714,7 @@ function updateDictCardByIdx(idx) {
         // Fallback to browser speech synthesis
         speakWord(word);
       }
+      typingInput.focus();
     });
   }
 }
@@ -841,6 +855,105 @@ function updateHeaderStats() {
   const goalPercent = getDailyGoalPercent();
   goalRingFill.setAttribute('stroke-dasharray', `${goalPercent}, 100`);
   goalProgressText.textContent = `${goalPercent}%`;
+}
+
+// ========== WPM CHART ==========
+
+function renderWpmChart() {
+  const canvas = document.getElementById('wpm-chart');
+  const avgLabel = document.getElementById('wpm-chart-avg');
+  if (!canvas || wpmHistory.length < 2) {
+    if (avgLabel) avgLabel.textContent = '';
+    return;
+  }
+
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = 80 * dpr;
+  ctx.scale(dpr, dpr);
+
+  const W = rect.width;
+  const H = 80;
+  const pad = { top: 8, bottom: 14, left: 36, right: 8 };
+  const chartW = W - pad.left - pad.right;
+  const chartH = H - pad.top - pad.bottom;
+
+  ctx.clearRect(0, 0, W, H);
+
+  const wpms = wpmHistory.map((s) => s.wpm);
+  const minWpm = Math.max(0, Math.min(...wpms) - 10);
+  const maxWpm = Math.max(...wpms) + 10;
+  const range = maxWpm - minWpm || 1;
+  const avgWpm = Math.round(wpms.reduce((a, b) => a + b, 0) / wpms.length);
+
+  avgLabel.textContent = `avg ${avgWpm} wpm`;
+
+  const timeStart = wpmHistory[0].time;
+  const timeEnd = wpmHistory[wpmHistory.length - 1].time;
+  const timeRange = timeEnd - timeStart || 1;
+
+  // Grid lines
+  ctx.strokeStyle = 'rgba(48, 54, 61, 0.8)';
+  ctx.lineWidth = 0.5;
+  const gridLines = 3;
+  for (let i = 0; i <= gridLines; i++) {
+    const y = pad.top + (chartH / gridLines) * i;
+    ctx.beginPath();
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(W - pad.right, y);
+    ctx.stroke();
+
+    const val = Math.round(maxWpm - (range / gridLines) * i);
+    ctx.fillStyle = '#535d6c';
+    ctx.font = '9px Inter, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(val, pad.left - 4, y + 3);
+  }
+
+  // Plot points
+  const points = wpmHistory.map((s) => ({
+    x: pad.left + ((s.time - timeStart) / timeRange) * chartW,
+    y: pad.top + chartH - ((s.wpm - minWpm) / range) * chartH,
+  }));
+
+  // Gradient fill under line
+  const gradient = ctx.createLinearGradient(0, pad.top, 0, H);
+  gradient.addColorStop(0, 'rgba(88, 166, 255, 0.25)');
+  gradient.addColorStop(1, 'rgba(88, 166, 255, 0)');
+
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, H - pad.bottom);
+  for (const p of points) ctx.lineTo(p.x, p.y);
+  ctx.lineTo(points[points.length - 1].x, H - pad.bottom);
+  ctx.closePath();
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) {
+    ctx.lineTo(points[i].x, points[i].y);
+  }
+  ctx.strokeStyle = '#58a6ff';
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // Glow
+  ctx.shadowColor = 'rgba(88, 166, 255, 0.5)';
+  ctx.shadowBlur = 6;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Latest point dot
+  const last = points[points.length - 1];
+  ctx.beginPath();
+  ctx.arc(last.x, last.y, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#79c0ff';
+  ctx.fill();
 }
 
 // ========== SPEECH SYNTHESIS FALLBACK ==========
