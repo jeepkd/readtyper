@@ -26,6 +26,7 @@ export class TypingEngine {
    * @param {number} startWordIndex - resume from this word
    */
   load(words, startWordIndex = 0) {
+    if (this._timer) clearInterval(this._timer);
     this.words = words;
     this.currentWordIndex = startWordIndex;
     this.currentCharIndex = 0;
@@ -37,6 +38,17 @@ export class TypingEngine {
     this.wordsCompleted = 0;
     this.wordErrors = {};
     this.isActive = false;
+
+    // Keep stats updating every second (for timer/WPM)
+    this._timer = setInterval(() => {
+      if (this.startTime) {
+        this._emitUpdate();
+      }
+    }, 1000);
+  }
+
+  destroy() {
+    if (this._timer) clearInterval(this._timer);
   }
 
   /**
@@ -73,8 +85,9 @@ export class TypingEngine {
     this.totalKeystrokes++;
 
     if (key === ' ') {
-      // Space = complete current word if we've typed something
-      if (this.typedBuffer.length > 0) {
+      // Only complete the word when all characters have been typed
+      const currentWord = this.words[this.currentWordIndex];
+      if (this.typedBuffer.length >= currentWord.length) {
         this._completeWord();
       }
       return;

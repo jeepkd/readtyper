@@ -38,6 +38,7 @@ let engine = new TypingEngine();
 let dictDefinitions = {};
 let sessionStartTime = null;
 let sessionWordsAtStart = 0;
+let lastRenderedWordIdx = -1;
 
 // ========== DOM REFERENCES ==========
 const $ = (id) => document.getElementById(id);
@@ -236,11 +237,13 @@ function loadChapter(chapterIdx, startWord = 0) {
   if (!chapter) return;
 
   // Setup engine
+  engine.destroy();
   engine = new TypingEngine();
   engine.load(chapter.words, startWord);
+  lastRenderedWordIdx = -1;
 
   engine.onUpdate = (state) => {
-    renderTextDisplay();
+    updateWordDisplay();
     updateStats(state);
     saveCurrentProgress();
   };
@@ -260,7 +263,7 @@ function loadChapter(chapterIdx, startWord = 0) {
       const w = chapter.words[i];
       if (!getCachedDefinition(w)) {
         fetchDefinition(w).then(() => {
-          updateDictCard(i, w);
+          updateDictCardByIdx(i);
         });
       }
     }
@@ -276,52 +279,103 @@ function loadChapter(chapterIdx, startWord = 0) {
   // Update UI
   updateBookInfo();
   renderChapterNav();
-  renderTextDisplay();
+  initialRenderTextDisplay();
   loadDictionary(chapter.words);
 
   // Focus input
   setTimeout(() => typingInput.focus(), 100);
 }
 
-function renderTextDisplay() {
-  const renderData = engine.getRenderData();
-  const currentIdx = engine.getState().currentWordIndex;
-
-  // Only render a window of words around current position for performance
-  const WINDOW_BEFORE = 50;
-  const WINDOW_AFTER = 100;
-  const startIdx = Math.max(0, currentIdx - WINDOW_BEFORE);
-  const endIdx = Math.min(renderData.length, currentIdx + WINDOW_AFTER);
+/**
+ * Build the full text display once. Each word gets a stable DOM element.
+ */
+function initialRenderTextDisplay() {
+  const chapter = currentBook.chapters[currentChapterIdx];
+  const words = chapter.words;
+  const startWord = engine.currentWordIndex;
 
   let html = '';
-  if (startIdx > 0) {
-    html += '<span class="word typed" style="opacity:0.3">…&nbsp;</span>';
-  }
-
-  for (let i = startIdx; i < endIdx; i++) {
-    const w = renderData[i];
+  for (let i = 0; i < words.length; i++) {
+    const word = words[i];
+    const isTyped = i < startWord;
+    const isCurrent = i === startWord;
     const classes = ['word'];
-    if (w.isCurrent) classes.push('current');
-    if (w.isTyped) classes.push('typed');
-    if (w.hasError) classes.push('has-error');
+    if (isCurrent) classes.push('current');
+    if (isTyped) classes.push('typed');
 
-    const charsHtml = w.chars
-      .map((c) => `<span class="char ${c.state}">${escapeHtml(c.char)}</span>`)
+    const charsHtml = word
+      .split('')
+      .map((char, ci) => {
+        let state = 'upcoming';
+        if (isTyped) state = 'correct';
+        else if (isCurrent && ci === 0) state = 'cursor';
+        return `<span class="char ${state}">${escapeHtml(char)}</span>`;
+      })
       .join('');
 
-    html += `<span class="${classes.join(' ')}" data-word-idx="${w.wordIdx}">${charsHtml}</span>`;
-  }
-
-  if (endIdx < renderData.length) {
-    html += '<span class="word" style="opacity:0.3">&nbsp;…</span>';
+    html += `<span class="${classes.join(' ')}" id="word-${i}" data-word-idx="${i}">${charsHtml}</span>`;
   }
 
   textDisplay.innerHTML = html;
+  lastRenderedWordIdx = startWord;
+  scrollCurrentWordIntoView();
+}
 
-  // Scroll current word into view
-  const currentWordEl = textDisplay.querySelector('.word.current');
-  if (currentWordEl) {
-    currentWordEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+/**
+ * Incrementally update only the affected word elements (no full re-render).
+ */
+function updateWordDisplay() {
+  const state = engine.getState();
+  const chapter = currentBook.chapters[currentChapterIdx];
+  const words = chapter.words;
+  const currIdx = state.currentWordIndex;
+
+  // If we moved to a new word, finalize the previous one
+  if (lastRenderedWordIdx !== currIdx && lastRenderedWordIdx >= 0 && lastRenderedWordIdx < words.length) {
+    const prevEl = document.getElementById(`word-${lastRenderedWordIdx}`);
+    if (prevEl) {
+      prevEl.className = engine.wordErrors[lastRenderedWordIdx] ? 'word typed has-error' : 'word typed';
+      const prevWord = words[lastRenderedWordIdx];
+      prevEl.innerHTML = prevWord
+        .split('')
+        .map((c) => `<span class="char correct">${escapeHtml(c)}</span>`)
+        .join('');
+    }
+  }
+
+  // Update current word's character states
+  if (currIdx < words.length) {
+    const currEl = document.getElementById(`word-${currIdx}`);
+    if (currEl) {
+      currEl.className = 'word current';
+      const word = words[currIdx];
+      currEl.innerHTML = word
+        .split('')
+        .map((char, ci) => {
+          let charState = 'upcoming';
+          if (ci < state.typedBuffer.length) {
+            charState = state.typedBuffer[ci] === char ? 'correct' : 'incorrect';
+          } else if (ci === state.typedBuffer.length) {
+            charState = 'cursor';
+          }
+          return `<span class="char ${charState}">${escapeHtml(char)}</span>`;
+        })
+        .join('');
+    }
+
+    // Only scroll when word changes (not on every char)
+    if (lastRenderedWordIdx !== currIdx) {
+      scrollCurrentWordIntoView();
+    }
+  }
+
+  lastRenderedWordIdx = currIdx;
+}
+
+function scrollCurrentWordIntoView() {
+  const el = textDisplay.querySelector('.word.current');
+  if (el) {
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 }
 
@@ -457,71 +511,51 @@ function updateBookInfo() {
   bookProgressText.textContent = `${percent}%`;
 }
 
-// ========== DICTIONARY PANEL ==========
-
 async function loadDictionary(words) {
-  // Create unique word list preserving order of appearance
-  const seen = new Set();
-  const uniqueWords = [];
-  for (const w of words) {
-    const clean = w.toLowerCase().replace(/[^a-z'-]/g, '');
-    if (clean.length >= 2 && !seen.has(clean)) {
-      seen.add(clean);
-      uniqueWords.push({ original: w, clean });
-    }
-  }
-
-  // Build word-to-index mapping for the words array
-  const wordToFirstIndex = {};
-  words.forEach((w, i) => {
-    const clean = w.toLowerCase().replace(/[^a-z'-]/g, '');
-    if (clean.length >= 2 && !(clean in wordToFirstIndex)) {
-      wordToFirstIndex[clean] = i;
-    }
-  });
-
-  // Render placeholder cards
-  dictList.innerHTML = uniqueWords
-    .map(({ original, clean }, i) => {
+  // Create one card per word occurrence, in text order
+  dictList.innerHTML = words
+    .map((w, i) => {
+      const clean = w.toLowerCase().replace(/[^a-z'-]/g, '');
+      if (clean.length < 2) return `<div class="dict-word-card" id="dict-card-idx-${i}" style="display:none"></div>`;
       return `
-        <div class="dict-word-card loading" id="dict-card-${clean}" data-word="${clean}" data-word-idx="${wordToFirstIndex[clean] || 0}">
-          <div class="dict-word-text">${escapeHtml(original)}</div>
+        <div class="dict-word-card loading" id="dict-card-idx-${i}" data-word="${clean}" data-word-idx="${i}">
+          <div class="dict-word-text">${escapeHtml(w)}</div>
         </div>
       `;
     })
     .join('');
 
   // Add click handlers
-  dictList.querySelectorAll('.dict-word-card').forEach((card) => {
+  dictList.querySelectorAll('.dict-word-card[data-word-idx]').forEach((card) => {
     card.addEventListener('click', () => {
       const wordIdx = parseInt(card.dataset.wordIdx, 10);
       jumpToWord(wordIdx);
     });
   });
 
-  // Fetch definitions batch
-  const cleanWords = uniqueWords.map((w) => w.clean);
-  dictDefinitions = await fetchDefinitionsBatch(cleanWords);
+  // Batch fetch unique definitions
+  const uniqueClean = [...new Set(
+    words.map((w) => w.toLowerCase().replace(/[^a-z'-]/g, '')).filter((w) => w.length >= 2)
+  )];
+  dictDefinitions = await fetchDefinitionsBatch(uniqueClean);
 
-  // Update cards with definitions
-  for (const { clean } of uniqueWords) {
-    updateDictCard(null, clean);
-  }
+  // Update all cards with fetched definitions
+  words.forEach((w, i) => updateDictCardByIdx(i));
 
   // Highlight initial word
   highlightDictWord(engine.currentWordIndex);
 }
 
-function updateDictCard(wordIdx, word) {
-  const clean = word.toLowerCase().replace(/[^a-z'-]/g, '');
-  const card = document.getElementById(`dict-card-${clean}`);
-  if (!card) return;
+function updateDictCardByIdx(idx) {
+  const card = document.getElementById(`dict-card-idx-${idx}`);
+  if (!card || !card.dataset.word) return;
 
-  const def = getCachedDefinition(word) || dictDefinitions[clean];
+  const clean = card.dataset.word;
+  const def = getCachedDefinition(clean) || dictDefinitions[clean];
   card.classList.remove('loading');
 
   if (!def) {
-    card.innerHTML = `<div class="dict-word-text">${escapeHtml(word)}</div><div class="dict-def" style="color:var(--text-muted);font-style:italic;">No definition available</div>`;
+    card.innerHTML = `<div class="dict-word-text">${escapeHtml(clean)}</div><div class="dict-def" style="color:var(--text-muted);font-style:italic;">No definition available</div>`;
     return;
   }
 
@@ -543,42 +577,31 @@ function updateDictCard(wordIdx, word) {
 }
 
 function highlightDictWord(wordIdx) {
-  if (!currentBook) return;
-  const chapter = currentBook.chapters[currentChapterIdx];
-  if (!chapter || wordIdx >= chapter.words.length) return;
-
-  const word = chapter.words[wordIdx];
-  const clean = word.toLowerCase().replace(/[^a-z'-]/g, '');
-
   // Remove previous highlight
   dictList.querySelectorAll('.dict-word-card.active').forEach((c) => c.classList.remove('active'));
 
-  const card = document.getElementById(`dict-card-${clean}`);
+  const card = document.getElementById(`dict-card-idx-${wordIdx}`);
   if (card) {
     card.classList.add('active');
   }
 }
 
 function scrollDictToWord(wordIdx) {
-  if (!currentBook) return;
-  const chapter = currentBook.chapters[currentChapterIdx];
-  if (!chapter || wordIdx >= chapter.words.length) return;
-
-  const word = chapter.words[wordIdx];
-  const clean = word.toLowerCase().replace(/[^a-z'-]/g, '');
-
-  const card = document.getElementById(`dict-card-${clean}`);
+  const card = document.getElementById(`dict-card-idx-${wordIdx}`);
   if (card) {
     card.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 }
 
 function jumpToWord(wordIdx) {
-  // This reloads the chapter from the target word
+  // Reload engine from the target word
   engine.load(currentBook.chapters[currentChapterIdx].words, wordIdx);
+  lastRenderedWordIdx = -1;
+
+  const chapter = currentBook.chapters[currentChapterIdx];
 
   engine.onUpdate = (state) => {
-    renderTextDisplay();
+    updateWordDisplay();
     updateStats(state);
     saveCurrentProgress();
   };
@@ -590,12 +613,11 @@ function jumpToWord(wordIdx) {
     scrollDictToWord(engine.currentWordIndex);
     highlightDictWord(engine.currentWordIndex);
 
-    const chapter = currentBook.chapters[currentChapterIdx];
     const lookAhead = 5;
     for (let i = engine.currentWordIndex; i < Math.min(engine.currentWordIndex + lookAhead, chapter.words.length); i++) {
       const w = chapter.words[i];
       if (!getCachedDefinition(w)) {
-        fetchDefinition(w).then(() => updateDictCard(i, w));
+        fetchDefinition(w).then(() => updateDictCardByIdx(i));
       }
     }
   };
@@ -603,7 +625,7 @@ function jumpToWord(wordIdx) {
   engine.onChapterComplete = () => completeChapter();
 
   saveCurrentProgress();
-  renderTextDisplay();
+  initialRenderTextDisplay();
   highlightDictWord(wordIdx);
   scrollDictToWord(wordIdx);
   typingInput.focus();
