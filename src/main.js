@@ -291,20 +291,10 @@ function loadChapter(chapterIdx, startWord = 0) {
     updateHeaderStats();
     recordActivity();
 
-    // Scroll dictionary to current word
+    // Update dictionary window
+    refreshDictWindow(engine.currentWordIndex);
     scrollDictToWord(engine.currentWordIndex);
     highlightDictWord(engine.currentWordIndex);
-
-    // Fetch definition for upcoming words
-    const lookAhead = 5;
-    for (let i = engine.currentWordIndex; i < Math.min(engine.currentWordIndex + lookAhead, chapter.words.length); i++) {
-      const w = chapter.words[i];
-      if (!getCachedDefinition(w)) {
-        fetchDefinition(w).then(() => {
-          updateDictCardByIdx(i);
-        });
-      }
-    }
   };
 
   engine.onChapterComplete = () => {
@@ -319,7 +309,7 @@ function loadChapter(chapterIdx, startWord = 0) {
   renderChapterNav();
   updateChapterStats();
   initialRenderTextDisplay();
-  loadDictionary(chapter.words);
+  loadDictionary(chapter.words, startWord);
 
   // Focus input
   setTimeout(() => typingInput.focus(), 100);
@@ -393,7 +383,7 @@ function updateWordDisplay() {
         .map((char, ci) => {
           let charState = 'upcoming';
           if (ci < state.typedBuffer.length) {
-            charState = state.typedBuffer[ci] === char ? 'correct' : 'incorrect';
+            charState = TypingEngine._charsMatch(state.typedBuffer[ci], char) ? 'correct' : 'incorrect';
           } else if (ci === state.typedBuffer.length) {
             charState = 'cursor';
           }
@@ -590,20 +580,38 @@ function updateBookInfo() {
   bookProgressFill.style.width = `${percent}%`;
   bookProgressText.textContent = `${percent}%`;
 }
+const DICT_WINDOW_BEFORE = 5;
+const DICT_WINDOW_AFTER = 35;
+let dictWindowStart = 0;
+let dictWindowEnd = 0;
 
-async function loadDictionary(words) {
-  // Create one card per word occurrence, in text order
-  dictList.innerHTML = words
-    .map((w, i) => {
-      const clean = w.toLowerCase().replace(/[^a-z'-]/g, '');
-      if (clean.length < 2) return `<div class="dict-word-card" id="dict-card-idx-${i}" style="display:none"></div>`;
-      return `
+async function loadDictionary(words, centerIdx = 0) {
+  dictWindowStart = Math.max(0, centerIdx - DICT_WINDOW_BEFORE);
+  dictWindowEnd = Math.min(words.length, centerIdx + DICT_WINDOW_AFTER);
+
+  renderDictWindow(words);
+  await fetchDictWindowDefinitions(words);
+
+  highlightDictWord(engine.currentWordIndex);
+}
+
+function renderDictWindow(words) {
+  let html = '';
+  for (let i = dictWindowStart; i < dictWindowEnd; i++) {
+    const w = words[i];
+    const clean = w.toLowerCase().replace(/[^a-z'-]/g, '');
+    if (clean.length < 2) {
+      html += `<div class="dict-word-card" id="dict-card-idx-${i}" style="display:none"></div>`;
+    } else {
+      html += `
         <div class="dict-word-card loading" id="dict-card-idx-${i}" data-word="${clean}" data-word-idx="${i}">
           <div class="dict-word-text">${escapeHtml(w)}</div>
         </div>
       `;
-    })
-    .join('');
+    }
+  }
+
+  dictList.innerHTML = html;
 
   // Add click handlers
   dictList.querySelectorAll('.dict-word-card[data-word-idx]').forEach((card) => {
@@ -612,18 +620,38 @@ async function loadDictionary(words) {
       jumpToWord(wordIdx);
     });
   });
+}
 
-  // Batch fetch unique definitions
+async function fetchDictWindowDefinitions(words) {
+  const windowWords = words.slice(dictWindowStart, dictWindowEnd);
   const uniqueClean = [...new Set(
-    words.map((w) => w.toLowerCase().replace(/[^a-z'-]/g, '')).filter((w) => w.length >= 2)
+    windowWords.map((w) => w.toLowerCase().replace(/[^a-z'-]/g, '')).filter((w) => w.length >= 2)
   )];
-  dictDefinitions = await fetchDefinitionsBatch(uniqueClean);
 
-  // Update all cards with fetched definitions
-  words.forEach((w, i) => updateDictCardByIdx(i));
+  // Only fetch words we don't already have
+  const toFetch = uniqueClean.filter((w) => !dictDefinitions[w] && !getCachedDefinition(w));
+  if (toFetch.length > 0) {
+    const newDefs = await fetchDefinitionsBatch(toFetch);
+    Object.assign(dictDefinitions, newDefs);
+  }
 
-  // Highlight initial word
-  highlightDictWord(engine.currentWordIndex);
+  for (let i = dictWindowStart; i < dictWindowEnd; i++) {
+    updateDictCardByIdx(i);
+  }
+}
+
+function refreshDictWindow(currentIdx) {
+  if (!currentBook) return;
+  const chapter = currentBook.chapters[currentChapterIdx];
+
+  // Only re-render if current word is near the end of the window
+  if (currentIdx < dictWindowEnd - 10 && currentIdx >= dictWindowStart) return;
+
+  dictWindowStart = Math.max(0, currentIdx - DICT_WINDOW_BEFORE);
+  dictWindowEnd = Math.min(chapter.words.length, currentIdx + DICT_WINDOW_AFTER);
+
+  renderDictWindow(chapter.words);
+  fetchDictWindowDefinitions(chapter.words);
 }
 
 function updateDictCardByIdx(idx) {
@@ -690,16 +718,10 @@ function jumpToWord(wordIdx) {
     addDailyWords(1);
     updateHeaderStats();
     recordActivity();
+
+    refreshDictWindow(engine.currentWordIndex);
     scrollDictToWord(engine.currentWordIndex);
     highlightDictWord(engine.currentWordIndex);
-
-    const lookAhead = 5;
-    for (let i = engine.currentWordIndex; i < Math.min(engine.currentWordIndex + lookAhead, chapter.words.length); i++) {
-      const w = chapter.words[i];
-      if (!getCachedDefinition(w)) {
-        fetchDefinition(w).then(() => updateDictCardByIdx(i));
-      }
-    }
   };
 
   engine.onChapterComplete = () => completeChapter();

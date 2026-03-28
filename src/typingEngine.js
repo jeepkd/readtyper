@@ -96,7 +96,7 @@ export class TypingEngine {
 
     // Regular character
     const expectedChar = currentWord[this.currentCharIndex];
-    if (key === expectedChar) {
+    if (TypingEngine._charsMatch(key, expectedChar)) {
       this.correctKeystrokes++;
     } else {
       this.errorCount++;
@@ -199,7 +199,7 @@ export class TypingEngine {
         } else if (wordIdx === this.currentWordIndex) {
           // Current word
           if (charIdx < this.typedBuffer.length) {
-            state = this.typedBuffer[charIdx] === char ? 'correct' : 'incorrect';
+            state = TypingEngine._charsMatch(this.typedBuffer[charIdx], char) ? 'correct' : 'incorrect';
           } else if (charIdx === this.typedBuffer.length) {
             state = 'cursor';
           }
@@ -221,4 +221,63 @@ export class TypingEngine {
       };
     });
   }
+
+  /**
+   * Check if a typed key matches an expected character,
+   * accounting for typographic equivalents (smart quotes, dashes, etc.)
+   */
+  static _charsMatch(typed, expected) {
+    if (typed === expected) return true;
+
+    const normalExpected = CHAR_EQUIVALENTS[expected];
+    if (normalExpected && normalExpected === typed) return true;
+
+    // Also check reverse: typed is the fancy char, expected is plain
+    const normalTyped = CHAR_EQUIVALENTS[typed];
+    if (normalTyped && normalTyped === expected) return true;
+
+    return false;
+  }
 }
+
+/**
+ * Map of typographic/Unicode characters → standard keyboard equivalents.
+ * If the book text has a fancy char, typing the plain version counts as correct.
+ */
+const CHAR_EQUIVALENTS = {
+  // Smart/curly quotes → straight quotes
+  '\u201C': '"',  // "
+  '\u201D': '"',  // "
+  '\u201E': '"',  // „
+  '\u201F': '"',  // ‟
+  '\u2018': "'",  // '
+  '\u2019': "'",  // '
+  '\u201A': "'",  // ‚
+  '\u201B': "'",  // ‛
+
+  // Dashes → hyphen
+  '\u2014': '-',  // — (em dash)
+  '\u2013': '-',  // – (en dash)
+  '\u2012': '-',  // ‒ (figure dash)
+  '\u2015': '-',  // ― (horizontal bar)
+
+  // Ellipsis
+  '\u2026': '.',  // … → .
+
+  // Spaces
+  '\u00A0': ' ',  // non-breaking space
+  '\u2002': ' ',  // en space
+  '\u2003': ' ',  // em space
+  '\u2009': ' ',  // thin space
+
+  // Other common ones
+  '\u00B7': '.',  // · (middle dot)
+  '\u2022': '*',  // • (bullet)
+  '\u00D7': 'x',  // × (multiplication sign)
+  '\u2032': "'",  // ′ (prime)
+  '\u2033': '"',  // ″ (double prime)
+  '\u00AB': '"',  // « (left guillemet)
+  '\u00BB': '"',  // » (right guillemet)
+  '\u2039': '<',  // ‹ (single left guillemet)
+  '\u203A': '>',  // › (single right guillemet)
+};
