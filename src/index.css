@@ -550,10 +550,17 @@ body {
   color: var(--goal);
 }
 
+/* Chapter stats */
+.chapter-stats {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
 /* Session stats */
 .session-stats {
   border-top: 1px solid var(--border);
-  padding-top: var(--space-lg);
+  padding-top: var(--space-md);
 }
 .stat-row {
   display: flex;
@@ -678,7 +685,7 @@ body {
   box-shadow: 0 0 12px var(--current-word-glow);
 }
 .word.typed {
-  opacity: 0.5;
+  opacity: 0.6;
 }
 .word.typed .char {
   color: var(--correct);
@@ -726,7 +733,7 @@ body {
   border-radius: var(--radius-md);
   border: 1px solid var(--border);
   margin-bottom: var(--space-sm);
-  background: var(--bg-elevated);
+  background: var(--bg-card);
   cursor: pointer;
   transition: all var(--transition-fast);
 }
@@ -736,16 +743,16 @@ body {
 }
 .dict-word-card.active {
   border-color: var(--current-word);
-  background: var(--current-word-glow);
+  background: rgba(255, 166, 87, 0.12);
   box-shadow: 0 0 12px rgba(255, 166, 87, 0.15);
 }
 .dict-word-card.loading {
   opacity: 0.6;
 }
 .dict-word-card.loading::after {
-  content: 'Loading…';
+  content: 'Loading\2026';
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-style: italic;
 }
 
@@ -753,14 +760,19 @@ body {
   font-family: var(--font-mono);
   font-weight: 600;
   font-size: 0.95rem;
-  color: var(--accent-bright);
+  color: #a5d6ff;
   margin-bottom: var(--space-xs);
 }
 .dict-phonetic {
-  font-size: 0.75rem;
-  color: var(--text-muted);
+  display: inline-block;
+  font-size: 0.85rem;
+  color: #7ee787;
   margin-bottom: var(--space-sm);
   font-style: italic;
+  background: rgba(126, 231, 135, 0.1);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  letter-spacing: 0.5px;
 }
 .dict-meaning {
   margin-bottom: var(--space-sm);
@@ -769,16 +781,16 @@ body {
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: var(--milestone);
+  color: #e2b4ff;
   font-weight: 600;
   margin-bottom: 2px;
 }
 .dict-def {
-  font-size: 0.8rem;
-  color: var(--text-secondary);
-  line-height: 1.4;
+  font-size: 0.82rem;
+  color: var(--text-primary);
+  line-height: 1.5;
   padding-left: var(--space-sm);
-  border-left: 2px solid var(--border);
+  border-left: 2px solid var(--text-muted);
   margin-bottom: var(--space-xs);
 }
 

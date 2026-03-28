@@ -65,6 +65,12 @@ const rtTime = $('rt-time');
 const rtWords = $('rt-words');
 const rtLiveWpm = $('rt-live-wpm');
 
+// Chapter stats
+const chBestWpm = $('ch-best-wpm');
+const chBestAccuracy = $('ch-best-accuracy');
+const chTotalTime = $('ch-total-time');
+const chSessions = $('ch-sessions');
+
 // Book info
 const bookTitle = $('current-book-title');
 const bookAuthor = $('current-book-author');
@@ -286,6 +292,7 @@ function loadChapter(chapterIdx, startWord = 0) {
   // Update UI
   updateBookInfo();
   renderChapterNav();
+  updateChapterStats();
   initialRenderTextDisplay();
   loadDictionary(chapter.words);
 
@@ -484,6 +491,39 @@ function completeChapter() {
       alert('🎉 Congratulations! You\'ve finished the book!');
       goToLibrary();
     }, 1500);
+  }
+}
+
+// ========== CHAPTER STATS ==========
+
+function updateChapterStats() {
+  const progress = getBookProgress(currentBookId);
+  const sessions = (progress.sessions || []).filter(
+    (s) => s.chapter === currentChapterIdx
+  );
+
+  if (sessions.length === 0) {
+    chBestWpm.textContent = '—';
+    chBestAccuracy.textContent = '—';
+    chTotalTime.textContent = '—';
+    chSessions.textContent = '0';
+    return;
+  }
+
+  const bestWpm = Math.max(...sessions.map((s) => s.wpm || 0));
+  const bestAcc = Math.max(...sessions.map((s) => s.accuracy || 0));
+  const totalSecs = sessions.reduce((sum, s) => sum + (s.duration || 0), 0);
+
+  chBestWpm.textContent = bestWpm;
+  chBestAccuracy.textContent = `${bestAcc}%`;
+  chSessions.textContent = sessions.length;
+
+  if (totalSecs < 60) {
+    chTotalTime.textContent = `${Math.round(totalSecs)}s`;
+  } else {
+    const mins = Math.floor(totalSecs / 60);
+    const secs = Math.round(totalSecs % 60);
+    chTotalTime.textContent = `${mins}m ${secs}s`;
   }
 }
 
