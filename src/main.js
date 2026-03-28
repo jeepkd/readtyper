@@ -118,7 +118,32 @@ function init() {
 
   // Typing input handler
   typingInput.addEventListener('keydown', (e) => {
+    // Skip shortcuts
+    if (e.ctrlKey && e.key === 'ArrowRight') {
+      e.preventDefault();
+      if (e.shiftKey) {
+        skipToNextSentence();
+      } else {
+        skipWords(10);
+      }
+      return;
+    }
     engine.handleKey(e);
+  });
+
+  // Skip buttons
+  $('skip-10').addEventListener('click', () => {
+    skipWords(10);
+    typingInput.focus();
+  });
+  $('skip-sentence').addEventListener('click', () => {
+    skipToNextSentence();
+    typingInput.focus();
+  });
+  $('skip-n').addEventListener('click', () => {
+    const n = parseInt($('skip-count').value, 10) || 10;
+    skipWords(n);
+    typingInput.focus();
   });
 
   // Settings
@@ -135,7 +160,7 @@ function init() {
 
   // Keep typing input focused
   document.addEventListener('click', (e) => {
-    if (typingView.classList.contains('active') && !e.target.closest('.sidebar') && !e.target.closest('.dictionary-panel') && !e.target.closest('.modal')) {
+    if (typingView.classList.contains('active') && !e.target.closest('.sidebar') && !e.target.closest('.dictionary-panel') && !e.target.closest('.modal') && !e.target.closest('.skip-controls')) {
       typingInput.focus();
     }
   });
@@ -684,6 +709,56 @@ function jumpToWord(wordIdx) {
   highlightDictWord(wordIdx);
   scrollDictToWord(wordIdx);
   typingInput.focus();
+}
+
+// ========== SKIP CONTROLS ==========
+
+function skipWords(count) {
+  if (!currentBook) return;
+  const chapter = currentBook.chapters[currentChapterIdx];
+  const currentIdx = engine.currentWordIndex;
+  const targetIdx = Math.min(currentIdx + count, chapter.words.length);
+
+  if (targetIdx <= currentIdx) return;
+
+  // Mark skipped words as typed in DOM
+  for (let i = currentIdx; i < targetIdx; i++) {
+    const el = document.getElementById(`word-${i}`);
+    if (el) {
+      el.className = 'word typed';
+      const word = chapter.words[i];
+      el.innerHTML = word
+        .split('')
+        .map((c) => `<span class="char correct">${escapeHtml(c)}</span>`)
+        .join('');
+    }
+  }
+
+  // Jump the engine forward
+  jumpToWord(targetIdx < chapter.words.length ? targetIdx : chapter.words.length - 1);
+}
+
+function skipToNextSentence() {
+  if (!currentBook) return;
+  const chapter = currentBook.chapters[currentChapterIdx];
+  const words = chapter.words;
+  const currentIdx = engine.currentWordIndex;
+
+  // Find next word that follows a sentence-ending punctuation
+  let targetIdx = currentIdx + 1;
+  for (let i = currentIdx; i < words.length; i++) {
+    const word = words[i];
+    const lastChar = word[word.length - 1];
+    if (lastChar === '.' || lastChar === '!' || lastChar === '?') {
+      targetIdx = i + 1;
+      break;
+    }
+  }
+
+  if (targetIdx >= words.length) targetIdx = words.length - 1;
+  if (targetIdx <= currentIdx) return;
+
+  skipWords(targetIdx - currentIdx);
 }
 
 // ========== VIEW MANAGEMENT ==========

@@ -182,6 +182,14 @@
                 <span class="rt-label">Live WPM</span>
               </div>
             </div>
+            <div class="skip-controls" id="skip-controls">
+              <button class="skip-btn" id="skip-10" title="Skip 10 words (Ctrl+→)">Skip 10 ▸</button>
+              <button class="skip-btn" id="skip-sentence" title="Skip to next sentence (Ctrl+Shift+→)">Skip Sentence ▸▸</button>
+              <div class="skip-custom">
+                <input type="number" id="skip-count" class="skip-input" min="1" max="500" value="50" title="Number of words to skip" />
+                <button class="skip-btn" id="skip-n">Skip</button>
+              </div>
+            </div>
             <div class="text-display" id="text-display">
               <!-- Words rendered by JS -->
             </div>
