@@ -1,8 +1,10 @@
 /**
  * Dictionary — fetches definitions from Free Dictionary API with caching
+ * Also fetches Thai translations via MyMemory Translation API
  */
 
 const API_BASE = 'https://api.dictionaryapi.dev/api/v2/entries/en/';
+const TRANSLATE_BASE = 'https://api.mymemory.translated.net/get';
 const CACHE_KEY = 'readtyper_dict_cache';
 
 // In-memory cache for current session
@@ -34,9 +36,7 @@ function saveCache() {
 loadCache();
 
 /**
- * Fetch definition for a word
- * @param {string} word
- * @returns {Promise<{word: string, phonetic: string, meanings: Array<{partOfSpeech: string, definitions: string[]}>} | null>}
+ * Fetch English definition for a word
  */
 export async function fetchDefinition(word) {
   const cleanWord = word.toLowerCase().replace(/[^a-z'-]/g, '');
@@ -87,6 +87,44 @@ export async function fetchDefinition(word) {
 }
 
 /**
+ * Fetch Thai translation for a word via MyMemory API
+ */
+export async function fetchThaiTranslation(word) {
+  const cleanWord = word.toLowerCase().replace(/[^a-z'-]/g, '');
+  if (!cleanWord || cleanWord.length < 2) return null;
+
+  const cacheKey = `th_${cleanWord}`;
+  if (memCache[cacheKey] !== undefined) {
+    return memCache[cacheKey];
+  }
+
+  try {
+    const url = `${TRANSLATE_BASE}?q=${encodeURIComponent(cleanWord)}&langpair=en|th`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      memCache[cacheKey] = null;
+      return null;
+    }
+
+    const data = await res.json();
+    const translation = data?.responseData?.translatedText;
+
+    if (!translation || translation.toLowerCase() === cleanWord) {
+      memCache[cacheKey] = null;
+      saveCache();
+      return null;
+    }
+
+    memCache[cacheKey] = translation;
+    saveCache();
+    return translation;
+  } catch {
+    memCache[cacheKey] = null;
+    return null;
+  }
+}
+
+/**
  * Batch fetch definitions for multiple words
  * Fetches in parallel with rate limiting
  */
@@ -131,4 +169,12 @@ export async function fetchDefinitionsBatch(words) {
 export function getCachedDefinition(word) {
   const cleanWord = word.toLowerCase().replace(/[^a-z'-]/g, '');
   return memCache[cleanWord] || null;
+}
+
+/**
+ * Get cached Thai translation (sync)
+ */
+export function getCachedThaiTranslation(word) {
+  const cleanWord = word.toLowerCase().replace(/[^a-z'-]/g, '');
+  return memCache[`th_${cleanWord}`] || null;
 }

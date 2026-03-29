@@ -879,6 +879,16 @@ body {
   background: rgba(126, 231, 135, 0.1);
   transform: scale(1.1);
 }
+.dict-thai {
+  font-size: 1rem;
+  color: #ffa657;
+  font-weight: 600;
+  padding: 4px 10px;
+  background: rgba(255, 166, 87, 0.1);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-sm);
+  line-height: 1.5;
+}
 .dict-meaning {
   margin-bottom: var(--space-sm);
 }

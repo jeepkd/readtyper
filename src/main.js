@@ -16,7 +16,7 @@ import {
   calcBookProgressPercent,
 } from './bookLibrary.js';
 import { TypingEngine } from './typingEngine.js';
-import { fetchDefinition, getCachedDefinition, fetchDefinitionsBatch } from './dictionary.js';
+import { fetchDefinition, getCachedDefinition, fetchDefinitionsBatch, fetchThaiTranslation, getCachedThaiTranslation } from './dictionary.js';
 import {
   recordActivity,
   getCurrentStreak,
@@ -651,6 +651,22 @@ async function fetchDictWindowDefinitions(words) {
   for (let i = dictWindowStart; i < dictWindowEnd; i++) {
     updateDictCardByIdx(i);
   }
+
+  // Fetch Thai translations in background (don't block rendering)
+  const toTranslate = uniqueClean.filter((w) => !getCachedThaiTranslation(w));
+  if (toTranslate.length > 0) {
+    for (const w of toTranslate) {
+      fetchThaiTranslation(w).then(() => {
+        // Update all cards that use this word
+        for (let i = dictWindowStart; i < dictWindowEnd; i++) {
+          const card = document.getElementById(`dict-card-idx-${i}`);
+          if (card && card.dataset.word === w) {
+            updateDictCardByIdx(i);
+          }
+        }
+      });
+    }
+  }
 }
 
 function refreshDictWindow(currentIdx) {
@@ -688,10 +704,16 @@ function updateDictCardByIdx(idx) {
   html += `<button class="dict-audio-btn" data-audio="${escapeHtml(def.audio || '')}" data-word="${escapeHtml(def.word)}" title="Listen to pronunciation">🔊</button>`;
   html += `</div>`;
 
+  // Thai translation
+  const thaiTranslation = getCachedThaiTranslation(clean);
+  if (thaiTranslation) {
+    html += `<div class="dict-thai">${escapeHtml(thaiTranslation)}</div>`;
+  }
+
   for (const meaning of def.meanings.slice(0, 2)) {
     html += `<div class="dict-meaning">`;
     html += `<div class="dict-pos">${escapeHtml(meaning.partOfSpeech)}</div>`;
-    for (const d of meaning.definitions.slice(0, 2)) {
+    for (const d of meaning.definitions.slice(0, 1)) {
       html += `<div class="dict-def">${escapeHtml(d)}</div>`;
     }
     html += `</div>`;
